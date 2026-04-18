@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 export const metadata: Metadata = {
   title: 'SmartMove - The Science of the Home Office',
   description: 'Curating the world\'s best ergonomic setups. Master your space. Perfect your pace.',
-  referrer: 'unsafe-url',
+  
 }
 
 export default function RootLayout({
