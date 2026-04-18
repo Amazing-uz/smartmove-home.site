@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export function proxy(request: NextRequest) {
   const url = request.nextUrl.clone()
-  const cookieName = 'cookie'
+  const cookieName = 'good'
 
 
    // Если зашли на / и есть кука
