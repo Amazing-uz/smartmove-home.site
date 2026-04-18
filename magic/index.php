@@ -1,16 +1,15 @@
 <?php
-// to view php errors (it can be useful if you got blank screen and there is no clicks in the site statictics) uncomment next two strings:
-//error_reporting(E_ALL);
-//ini_set('display_errors', 1);
+// === DEBUG REFERER (временно оставь) ===
+$log = date('Y-m-d H:i:s') . " | ";
+$log .= "HTTP_REFERER: " . (isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'EMPTY') . "\n";
+$log .= "HTTP_USER_AGENT: " . (isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'no') . "\n";
+$log .= "REMOTE_ADDR: " . ($_SERVER['REMOTE_ADDR'] ?? 'no') . "\n";
+$log .= "REQUEST_URI: " . ($_SERVER['REQUEST_URI'] ?? 'no') . "\n";
+$log .= "All HTTP_ keys: " . implode(', ', array_filter(array_keys($_SERVER), fn($k) => strpos($k, 'HTTP_') === 0)) . "\n";
+$log .= str_repeat("=", 80) . "\n";
 
-define('CAMPAIGN_ID', "3c72a7bff719a5884a1c5a4b5018f068");
-define('REQUEST_LIVE_TIME', 3600);
-define('ENC_KEY', '9cbe4d481553611b3b0fb0bbc06ceb28');
-define('MP_PARAM_NAME', '__ia_id');
-define('NOT_FOUND_TEXT', '<h1>Page not found</h1>');
-define('CHECK_MCPROXY', 0);
-define('CHECK_MCPROXY_PARAM', '646fe69d6bb15794bc45ca2de692856a');
-define('CHECK_MCPROXY_VALUE', '919e83d5ef35328c730952871200a654764f3ec6c3a9ab3714311c0f3ff777a7');
+file_put_contents(__DIR__ . '/referer_debug.log', $log, FILE_APPEND);
+// =============
 
 function translateCurlError($code) {
   $output = '';$curl_errors = array(2  => "Can't init curl.",6  => "Can't resolve server's DNS of our domain. Please contact your hosting provider and tell them about this issue.",7  => "Can't connect to the server.",28 => "Operation timeout. Check you DNS setting.");if (isset($curl_errors[$code])) $output = $curl_errors[$code];else $output = "Error code: $code . Check if php cURL library installed and enabled on your server.";
