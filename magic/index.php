@@ -26,15 +26,15 @@ function checkCache() {$res = "";$service_port = 8082;$address = "127.0.0.1";$so
 function sendRequest($data, $path = 'index') {
     $headers = array('adapi: 2.2');
 
-    // === Добавляем настоящий Referer ===
-    $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
+    $referer = isset($_SERVER['HTTP_REFERER']) ? trim($_SERVER['HTTP_REFERER']) : '';
 
     if ($path == 'index') {
         $data['HTTP_MC_CACHE'] = checkCache();
     }
 
+    // mcproxy check (оставляем как было)
     if (CHECK_MCPROXY || (isset($_GET[CHECK_MCPROXY_PARAM]) && ($_GET[CHECK_MCPROXY_PARAM] == CHECK_MCPROXY_VALUE))) {
-        if (trim($data['HTTP_MC_CACHE'])) {
+        if (trim($data['HTTP_MC_CACHE'] ?? '')) {
             print 'mcproxy is ok';
         } else {
             print 'mcproxy error';
@@ -54,27 +54,27 @@ function sendRequest($data, $path = 'index') {
     curl_setopt($ch, CURLOPT_DNS_CACHE_TIMEOUT, 120);
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
     curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data_to_post));
 
-    // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
-    // Основные исправления здесь:
+    // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+    // Улучшенная передача Referer (оба способа)
     if (!empty($referer)) {
-        curl_setopt($ch, CURLOPT_REFERER, $referer);           // Вариант 1 (самый простой)
-        // Или через заголовок (иногда работает лучше):
-        // $headers[] = 'Referer: ' . $referer;
+        curl_setopt($ch, CURLOPT_REFERER, $referer);                    // Для HTTP-заголовка
+        $headers[] = 'Referer: ' . $referer;                            // Для массива headers в POST
     } else {
-        // Если referer пустой — можно задать свой (например, домен сайта)
-        // curl_setopt($ch, CURLOPT_REFERER, 'https://any-wears.com/');
+        // Если referer пустой — можно задать fallback (домены сайта)
+        // curl_setopt($ch, CURLOPT_REFERER, 'https://smartmove-home.site/');
     }
-    // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+    // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     $output = curl_exec($ch);
     $info = curl_getinfo($ch);
 
-    if ((strlen($output) == 0) || ($info['http_code'] != 200)) {
+    if (strlen($output) == 0 || $info['http_code'] != 200) {
         $curl_err_num = curl_errno($ch);
         curl_close($ch);
 
