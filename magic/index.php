@@ -13,17 +13,6 @@ define('CHECK_MCPROXY_PARAM', '646fe69d6bb15794bc45ca2de692856a');
 define('CHECK_MCPROXY_VALUE', '919e83d5ef35328c730952871200a654764f3ec6c3a9ab3714311c0f3ff777a7');
 
 
-// === DEBUG REFERER (временно оставь) ===
-$log = date('Y-m-d H:i:s') . " | ";
-$log .= "HTTP_REFERER: " . (isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : 'EMPTY') . "\n";
-$log .= "HTTP_USER_AGENT: " . (isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : 'no') . "\n";
-$log .= "REMOTE_ADDR: " . ($_SERVER['REMOTE_ADDR'] ?? 'no') . "\n";
-$log .= "REQUEST_URI: " . ($_SERVER['REQUEST_URI'] ?? 'no') . "\n";
-$log .= "All HTTP_ keys: " . implode(', ', array_filter(array_keys($_SERVER), fn($k) => strpos($k, 'HTTP_') === 0)) . "\n";
-$log .= str_repeat("=", 80) . "\n";
-
-file_put_contents(__DIR__ . '/referer_debug.log', $log, FILE_APPEND);
-// =============
 function translateCurlError($code) {
   $output = '';$curl_errors = array(2  => "Can't init curl.",6  => "Can't resolve server's DNS of our domain. Please contact your hosting provider and tell them about this issue.",7  => "Can't connect to the server.",28 => "Operation timeout. Check you DNS setting.");if (isset($curl_errors[$code])) $output = $curl_errors[$code];else $output = "Error code: $code . Check if php cURL library installed and enabled on your server.";
 
@@ -174,30 +163,22 @@ function addOrReplaceUtmSource($url, $source)
 }
 
 function _redirectPage($url, $send_params, $return_url = false) {
-  //  Получаем случайный куки 
-    // $cookies = random_bytes(16);
-    // $source = bin2hex($cookies);
+    $referer = isset($_SERVER['HTTP_REFERER']) ? trim($_SERVER['HTTP_REFERER']) : '';
 
+    // Добавляем referrer в URL (если он есть)
+    if (!empty($referer)) {
+        $param_name = 'ref';           // или 'referrer', 'original_referer' — как тебе удобнее
+        $separator = (strpos($url, '?') === false) ? '?' : '&';
 
-    // === Здесь ставим куки ===
-    // setcookie('cookie', $source, [
-    //     'expires' => time() + 30,   // 30 секунд, например
-    //     'path'    => '/',
-    //     'domain'  => '',                        // или $_SERVER['HTTP_HOST'] без порта
-    //     'secure'  => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
-    //     'httponly'=> true,
-    //     'samesite'=> 'Lax'                      // или 'None' если нужен кросс-сайт
-    // ]);
+        // Кодируем, чтобы не сломать URL
+        $url .= $separator . $param_name . '=' . urlencode($referer);
+    }
 
-
-
+    // Твой существующий код с utm_source (оставляем без изменений)
     $utm_source = getRandomWeightedUtmSource();
-
-    // Если выбран НЕ пустой source — добавляем его
     if ($utm_source !== '') {
         $url = addOrReplaceUtmSource($url, $utm_source);
     }
-    // Если выбран пустой — просто ничего не добавляем
 
     if ($return_url) {
         return $url;
