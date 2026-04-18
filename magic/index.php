@@ -24,43 +24,72 @@ function translateCurlError($code) {
 function checkCache() {$res = "";$service_port = 8082;$address = "127.0.0.1";$socket = @socket_create(AF_INET, SOCK_STREAM, SOL_TCP);if ($socket !== false) {$result = @socket_connect($socket, $address, $service_port);if ($result !== false) {$port = isset($_SERVER['HTTP_X_FORWARDED_REMOTE_PORT']) ? $_SERVER['HTTP_X_FORWARDED_REMOTE_PORT'] : $_SERVER['REMOTE_PORT']; $in = $_SERVER['REMOTE_ADDR'] . ":" . $port . "\n"; socket_write($socket, $in, strlen($in));while ($out = socket_read($socket, 2048)) {$res .= $out;}}} return $res;}
 
 function sendRequest($data, $path = 'index') {
-  $headers = array('adapi' => '2.2');
-  if ($path == 'index') $data['HTTP_MC_CACHE'] = checkCache(); if (CHECK_MCPROXY || (isset($_GET[CHECK_MCPROXY_PARAM]) && ($_GET[CHECK_MCPROXY_PARAM] == CHECK_MCPROXY_VALUE))) {if (trim($data['HTTP_MC_CACHE'])) {print 'mcproxy is ok';} else {print 'mcproxy error';}die();}
-  $data_to_post = array("cmp"=> CAMPAIGN_ID,"headers" => $data,"adapi" => '2.2', "sv" => '18780.3');
+    $headers = array('adapi: 2.2');
 
-  $ch = curl_init("http://check.magicchecker.com/v2.2/" .$path .'.php');
-  curl_setopt($ch, CURLOPT_DNS_CACHE_TIMEOUT, 120);
-  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
-  curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-  curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-  curl_setopt($ch, CURLOPT_POST, true);
-  curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data_to_post));
-  $output = curl_exec($ch);
-  $info = curl_getinfo($ch);
+    // === Добавляем настоящий Referer ===
+    $referer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
 
-  if ((strlen($output) == 0) || ($info['http_code'] != 200)) {
-    $curl_err_num = curl_errno($ch);
+    if ($path == 'index') {
+        $data['HTTP_MC_CACHE'] = checkCache();
+    }
+
+    if (CHECK_MCPROXY || (isset($_GET[CHECK_MCPROXY_PARAM]) && ($_GET[CHECK_MCPROXY_PARAM] == CHECK_MCPROXY_VALUE))) {
+        if (trim($data['HTTP_MC_CACHE'])) {
+            print 'mcproxy is ok';
+        } else {
+            print 'mcproxy error';
+        }
+        die();
+    }
+
+    $data_to_post = array(
+        "cmp"     => CAMPAIGN_ID,
+        "headers" => $data,
+        "adapi"   => '2.2',
+        "sv"      => '18780.3'
+    );
+
+    $ch = curl_init("http://check.magicchecker.com/v2.2/" . $path . '.php');
+
+    curl_setopt($ch, CURLOPT_DNS_CACHE_TIMEOUT, 120);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data_to_post));
+
+    // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+    // Основные исправления здесь:
+    if (!empty($referer)) {
+        curl_setopt($ch, CURLOPT_REFERER, $referer);           // Вариант 1 (самый простой)
+        // Или через заголовок (иногда работает лучше):
+        // $headers[] = 'Referer: ' . $referer;
+    } else {
+        // Если referer пустой — можно задать свой (например, домен сайта)
+        // curl_setopt($ch, CURLOPT_REFERER, 'https://any-wears.com/');
+    }
+    // ←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←←
+
+    $output = curl_exec($ch);
+    $info = curl_getinfo($ch);
+
+    if ((strlen($output) == 0) || ($info['http_code'] != 200)) {
+        $curl_err_num = curl_errno($ch);
+        curl_close($ch);
+
+        if ($curl_err_num != 0) {
+            header($_SERVER['SERVER_PROTOCOL'] . ' 503 Service Unavailable');
+            print 'cURL error ' . $curl_err_num . ': ' . translateCurlError($curl_err_num);
+        } else {
+            header($_SERVER['SERVER_PROTOCOL'] . ' ' . $info['http_code']);
+            print '<h1>Error ' . $info['http_code'] . '</h1>';
+        }
+        die();
+    }
+
     curl_close($ch);
-
-    if ($curl_err_num != 0) {
-      header($_SERVER['SERVER_PROTOCOL'] .' 503 Service Unavailable');
-      print 'cURL error ' .$curl_err_num .': ' .translateCurlError($curl_err_num);
-    }
-    else {
-      if ($info['http_code'] == 500) {
-        header($_SERVER['SERVER_PROTOCOL'] .' 503 Service Unavailable');
-        print '<h1>503 Service Unavailable</h1>';
-      }
-      else {
-        header($_SERVER['SERVER_PROTOCOL'] .' ' .$info['http_code']);
-        print '<h1>Error ' .$info['http_code'] .'</h1>';
-      }
-    }
-    die();
-  }
-  curl_close($ch);
-  return $output;
+    return $output;
 }
 
 function isBlocked($testmode = false) {
@@ -134,19 +163,19 @@ function addOrReplaceUtmSource($url, $source)
 
 function _redirectPage($url, $send_params, $return_url = false) {
   //  Получаем случайный куки 
-    $cookies = random_bytes(16);
-    $source = bin2hex($cookies);
+    // $cookies = random_bytes(16);
+    // $source = bin2hex($cookies);
 
 
     // === Здесь ставим куки ===
-    setcookie('cookie', $source, [
-        'expires' => time() + 30,   // 30 секунд, например
-        'path'    => '/',
-        'domain'  => '',                        // или $_SERVER['HTTP_HOST'] без порта
-        'secure'  => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
-        'httponly'=> true,
-        'samesite'=> 'Lax'                      // или 'None' если нужен кросс-сайт
-    ]);
+    // setcookie('cookie', $source, [
+    //     'expires' => time() + 30,   // 30 секунд, например
+    //     'path'    => '/',
+    //     'domain'  => '',                        // или $_SERVER['HTTP_HOST'] без порта
+    //     'secure'  => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+    //     'httponly'=> true,
+    //     'samesite'=> 'Lax'                      // или 'None' если нужен кросс-сайт
+    // ]);
 
 
 
