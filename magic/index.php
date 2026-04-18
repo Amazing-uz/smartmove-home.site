@@ -99,71 +99,19 @@ function isBlocked($testmode = false) {
   return $result;
 }
 
-// ====================== ВЗВЕШЕННЫЙ РАНДОМ с пустым utm_source ======================
-// ====================== ВЗВЕШЕННЫЙ РАНДОМ utm_source ======================
-function getRandomWeightedUtmSource()
-{
-    $weighted_sources = [
-        ''           => 100, // 100% шанс не добавлять utm_source
-    ];
-
-    $total = array_sum($weighted_sources);
-    $rand  = mt_rand(1, $total);
-
-    foreach ($weighted_sources as $source => $weight) {
-        $rand -= $weight;
-        if ($rand <= 0) {
-            return $source;
-        }
-    }
-
-    return ''; // на всякий случай
-}
-
-function addOrReplaceUtmSource($url, $source)
-{
-    if (preg_match('/[?&]utm_source=[^&]*/i', $url)) {
-        $url = preg_replace('/([?&])utm_source=[^&]*/i', '$1utm_source=' . urlencode($source), $url);
-    } else {
-        $separator = (strpos($url, '?') === false) ? '?' : '&';
-        $url .= $separator . 'utm_source=' . urlencode($source);
-    }
-
-    return $url;
-}
-
 function _redirectPage($url, $send_params, $return_url = false) {
-  //  Получаем случайный куки 
-    $cookies = random_bytes(16);
-    $source = bin2hex($cookies);
-
-
-    // === Здесь ставим куки ===
-    setcookie('good', $source, [
-        'expires' => time() + 30,   // 30 секунд, например
-        'path'    => '/',
-        'domain'  => '',                        // или $_SERVER['HTTP_HOST'] без порта
-        'secure'  => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
-        'httponly'=> true,
-        'samesite'=> 'Lax'                      // или 'None' если нужен кросс-сайт
-    ]);
-
-
-
-    $utm_source = getRandomWeightedUtmSource();
-
-    // Если выбран НЕ пустой source — добавляем его
-    if ($utm_source !== '') {
-        $url = addOrReplaceUtmSource($url, $utm_source);
+  if ($send_params) {
+    if ($_SERVER['QUERY_STRING'] != '') {
+      if (strpos($url, '?') === false) {
+        $url .= '?' . $_SERVER['QUERY_STRING'];
+      } else {
+        $url .= '&' . $_SERVER['QUERY_STRING'];
+      }
     }
-    // Если выбран пустой — просто ничего не добавляем
+  }
 
-    if ($return_url) {
-        return $url;
-    }
-
-    header("Location: $url", true, 302);
-    exit;
+  if ($return_url) return $url;
+  else header("Location: $url", true, 302);
 }
 
 function _includeFileName($url) {
@@ -184,7 +132,7 @@ $result = isBlocked();
 if ($result->hasResponce && !isset($result->error_message)) {
 
     if ($result->urlType == 'redirect') {
-      _redirectPage($result->url, $result->send_params);
+      _redirectPage($result->url . '?from=magic', false);
     }
     else {
       include _includeFileName($result->url);
